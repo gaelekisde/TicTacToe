@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:JueguitoLenguajes"
         xmlns:vm="clr-namespace:JueguitoLenguajes.ViewModel"
         xmlns:conv="clr-namespace:JueguitoLenguajes.Converters"
+        xmlns:ap="clr-namespace:JueguitoLenguajes.AttachedProperties"
         mc:Ignorable="d"
         Title="Tic Tac Toe" Height="727" Width="800">
 
@@ -290,9 +291,10 @@
                          Style="{StaticResource EstiloTextBox}" Margin="0,0,0,20"/>
 
                 <TextBlock Text="Contraseña" FontSize="14" Foreground="#E0B0FF" Margin="0,0,0,8"/>
-                <PasswordBox x:Name="PwdJ1Box" 
-                             Style="{StaticResource EstiloPasswordBox}" Margin="0,0,0,30"
-                             PasswordChanged="PwdJ1Box_PasswordChanged"/>
+<PasswordBox x:Name="PwdJ1Box" 
+                              Style="{StaticResource EstiloPasswordBox}" Margin="0,0,0,30"
+                              ap:PasswordBoxHelper.Password="{Binding PwdJ1, Mode=TwoWay}"
+                              PasswordChanged="PwdJ1Box_PasswordChanged"/>
 
 <Button Content="INICIAR SESIÓN"
                          Style="{StaticResource EstiloBoton}"
@@ -329,12 +331,21 @@
 
                 <TextBlock Text="Usuario" FontSize="14" Foreground="#E0B0FF" Margin="0,0,0,8"/>
                 <TextBox Text="{Binding NombreRegistro, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource EstiloTextBox}" Margin="0,0,0,20"/>
+                         Style="{StaticResource EstiloTextBox}" Margin="0,0,0,4"/>
+                <TextBlock Text="{Binding ErrorNombre}" FontSize="12" Foreground="#FF6B6B" 
+                           Margin="0,0,0,16" FontFamily="Segoe UI"/>
 
                 <TextBlock Text="Contraseña" FontSize="14" Foreground="#E0B0FF" Margin="0,0,0,8"/>
                 <PasswordBox x:Name="PwdRegistroBox"
-                             Style="{StaticResource EstiloPasswordBox}" Margin="0,0,0,20"
+                             Style="{StaticResource EstiloPasswordBox}" Margin="0,0,0,4"
+                             ap:PasswordBoxHelper.Password="{Binding PwdRegistro, Mode=TwoWay}"
                              PasswordChanged="PwdRegistroBox_PasswordChanged"/>
+                <TextBlock Text="{Binding ErrorPassword}" FontSize="12" Foreground="#FF6B6B" 
+                           Margin="0,0,0,16" FontFamily="Segoe UI"/>
+
+                <TextBlock Text="{Binding ErrorGeneral}" FontSize="14" Foreground="#4ADE80" 
+                           FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,16" 
+                           FontFamily="Segoe UI"/>
 
                 <Button Content="REGISTRAR"
                         Style="{StaticResource EstiloBoton}"
@@ -373,6 +384,7 @@
                 <TextBlock Text="Contraseña" FontSize="14" Foreground="#E0B0FF" Margin="0,0,0,8"/>
                 <PasswordBox x:Name="PwdJ2Box"
                              Style="{StaticResource EstiloPasswordBox}" Margin="0,0,0,20"
+                             ap:PasswordBoxHelper.Password="{Binding PwdJ2, Mode=TwoWay}"
                              PasswordChanged="PwdJ2Box_PasswordChanged"/>
 
                 <Button Content="INICIAR SESIÓN"
@@ -394,6 +406,14 @@
 
         <!-- Pantalla de Juego -->
         <Grid Visibility="{Binding MostrarJuego, Converter={StaticResource BoolToVisibility}}">
+            <Button Content="CERRAR SESIÓN"
+                    Style="{StaticResource EstiloBotonSecundario}"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,20,20,0"
+                    Command="{Binding CerrarSesionCommand}"
+                    Width="180"/>
+
             <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left"
                         Margin="30,0,0,30" Opacity="0.85">
                 <TextBlock Text="tic." FontFamily="Segoe UI Black" FontSize="68"
@@ -474,6 +494,30 @@
                         </Border>
                     </Grid>
 
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <Border CornerRadius="10" Padding="12,6" Margin="0,0,16,0">
+                            <Border.Background>
+                                <SolidColorBrush Color="#FF8C00"/>
+                            </Border.Background>
+                            <TextBlock FontFamily="Segoe UI Black" FontSize="14" Foreground="#3A1A00">
+                                <Run Text="NIVEL: "/>
+                                <Run Text="{Binding NivelBot}"/>
+                            </TextBlock>
+                        </Border>
+
+                        <Border CornerRadius="10" Padding="12,6"
+                                Visibility="{Binding EsMultijugador, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}">
+                            <Border.Background>
+                                <SolidColorBrush Color="#4ADE80"/>
+                            </Border.Background>
+                            <TextBlock FontFamily="Segoe UI Black" FontSize="14" Foreground="#0A2E18">
+                                <Run Text="TIEMPO: "/>
+                                <Run Text="{Binding TiempoRestante}"/>
+                                <Run Text="s"/>
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+
                     <TextBlock Text="{Binding MensajeTurno}"
                                FontFamily="Segoe UI Semibold"
                                FontSize="14"
@@ -509,6 +553,71 @@
                     <Button Content="Nuevo Juego"
                             Style="{StaticResource EstiloBoton}"
                             Command="{Binding ReiniciarJuegoCommand}"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid x:Name="VentanaEmergente" Visibility="{Binding MostrarPopup, Converter={StaticResource BoolToVisibility}}" Opacity="1">
+            <Rectangle Fill="#AA000000"/>
+            <Border x:Name="PopupCard" HorizontalAlignment="Center" VerticalAlignment="Center" CornerRadius="24" Padding="40,36" Width="400" RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Border.RenderTransform>
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#1E0840" Offset="0"/>
+                        <GradientStop Color="#2D0A50" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="60" ShadowDepth="12" Opacity="0.8"/>
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="{Binding PopupEmoji}" FontSize="52" HorizontalAlignment="Center" Margin="0,0,0,10" Foreground="White"/>
+                    <TextBlock Text="{Binding PopupTitulo}" FontFamily="Segoe UI Black" FontSize="32" FontWeight="Bold" Foreground="#FF9F1C" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding PopupSubtitulo}" FontFamily="Segoe UI Semibold" FontSize="14" Foreground="#C8A0FF" HorizontalAlignment="Center" Margin="0,0,0,28"/>
+                    <Border CornerRadius="16" Padding="20,16" Margin="0,0,0,28" Background="#3D1066">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.3"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="ESTADÍSTICAS TOTALES" FontFamily="Segoe UI Black" FontSize="11" Foreground="#9060C0" HorizontalAlignment="Center" Margin="0,0,0,14" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding VictoriasJ1}" FontFamily="Segoe UI Black" FontSize="36" Foreground="#FF9F1C" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="X GANA" FontFamily="Segoe UI Black" FontSize="9" Foreground="#FF9F1C" HorizontalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                                <Rectangle Grid.Column="1" Width="1" Height="50" Fill="#5A1A8A" Margin="8,0"/>
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Empates}" FontFamily="Segoe UI Black" FontSize="36" Foreground="#E0B0FF" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="EMPATE" FontFamily="Segoe UI Black" FontSize="9" Foreground="#E0B0FF" HorizontalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                                <Rectangle Grid.Column="3" Width="1" Height="50" Fill="#5A1A8A" Margin="8,0"/>
+                                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding VictoriasJ2}" FontFamily="Segoe UI Black" FontSize="36" Foreground="#4ADE80" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="O GANA" FontFamily="Segoe UI Black" FontSize="9" Foreground="#4ADE80" HorizontalAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </Grid>
+                            <Border CornerRadius="6" Height="10" Margin="0,16,0,0" Background="#2D0A50" ClipToBounds="True">
+                                <Grid>
+                                    <Border x:Name="BarraX" HorizontalAlignment="Left" CornerRadius="6,0,0,6" Width="0" Background="#FF9F1C"/>
+                                    <Border x:Name="BarraO" HorizontalAlignment="Right" CornerRadius="0,6,6,0" Width="0" Background="#4ADE80"/>
+                                </Grid>
+                            </Border>
+                            <Grid Margin="0,4,0,0">
+                                <TextBlock Text="X" FontFamily="Segoe UI Black" FontSize="10" Foreground="#FF9F1C" HorizontalAlignment="Left"/>
+                                <TextBlock Text="O" FontFamily="Segoe UI Black" FontSize="10" Foreground="#4ADE80" HorizontalAlignment="Right"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Button Content="▶  Nuevo Juego" Style="{StaticResource EstiloBoton}" Command="{Binding NuevoJuegoPopupCommand}"/>
                 </StackPanel>
             </Border>
         </Grid>

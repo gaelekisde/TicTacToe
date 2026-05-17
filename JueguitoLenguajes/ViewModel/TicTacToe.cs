@@ -9,6 +9,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace JueguitoLenguajes.ViewModel
 {
@@ -33,6 +34,7 @@ namespace JueguitoLenguajes.ViewModel
             Sesion.DeserializarCuentas();
 
             InicializarTablero();
+            InicializarTimer();
 
             MarcarCasillaCommand = new RelayCommand<object>(MarcarCasilla);
             ReiniciarJuegoCommand = new RelayCommand(ReiniciarJuego);
@@ -44,6 +46,62 @@ namespace JueguitoLenguajes.ViewModel
             RegistrarCommand = new RelayCommand(Registrar);
             VolverLoginCommand = new RelayCommand(VolverLogin);
             VolverALoginJ1Command = new RelayCommand(VolverALoginJ1);
+            NuevoJuegoPopupCommand = new RelayCommand(AccionNuevoJuegoPopup);
+            CerrarSesionCommand = new RelayCommand(CerrarSesion);
+        }
+
+        private void InicializarTimer()
+        {
+            timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            timer.Tick += OnTimerTick;
+        }
+
+        private void IniciarTimer()
+        {
+            DetenerTimer();
+            TiempoRestante = TiempoMaximo;
+            timer?.Start();
+        }
+
+        private void DetenerTimer()
+        {
+            timer?.Stop();
+        }
+
+        private void OnTimerTick(object? sender, EventArgs e)
+        {
+            if (!JuegoActivo) return;
+            if (EsMultijugador || EsMultijugadorLocal) return;
+            if (TurnoActual != Turno.X) return;
+            if (botEnProgreso) return;
+
+            TiempoRestante--;
+
+            if (TiempoRestante <= 0)
+            {
+                DetenerTimer();
+                TiempoRestante = 0;
+                TurnoActual = Turno.O;
+                Notificar(nameof(MensajeTurno));
+                Notificar(nameof(ColorTurno));
+                Notificar(nameof(TiempoRestante));
+
+                if (!EsMultijugador && !EsMultijugadorLocal && TurnoActual == Turno.O)
+                {
+                    botEnProgreso = true;
+                    System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            JugarTurnoBot();
+                            botEnProgreso = false;
+                        });
+                    });
+                }
+            }
         }
 
         public ICommand MarcarCasillaCommand { get; set; }
@@ -56,6 +114,42 @@ namespace JueguitoLenguajes.ViewModel
         public ICommand RegistrarCommand { get; set; }
         public ICommand VolverLoginCommand { get; set; }
         public ICommand VolverALoginJ1Command { get; set; }
+        public ICommand NuevoJuegoPopupCommand { get; set; }
+        public ICommand CerrarSesionCommand { get; set; }
+
+        private Dictionary<int, int> TiemposPorNivel = new()
+        {
+            { 1, 10 },
+            { 2, 5 },
+            { 3, 2 }
+        };
+
+        private DispatcherTimer? timer;
+        private bool botEnProgreso = false;
+        private int tiempoRestante = 10;
+        public int TiempoRestante
+        {
+            get => tiempoRestante;
+            set
+            {
+                tiempoRestante = value;
+                Notificar(nameof(TiempoRestante));
+            }
+        }
+
+        private int nivelBot = 1;
+        public int NivelBot
+        {
+            get => nivelBot;
+            set
+            {
+                nivelBot = value;
+                Notificar(nameof(NivelBot));
+                Notificar(nameof(TiempoMaximo));
+            }
+        }
+
+        public int TiempoMaximo => TiemposPorNivel.ContainsKey(NivelBot) ? TiemposPorNivel[NivelBot] : 10;
 
         // Control de vistas
         private bool mostrarLoginJ1 = true;
@@ -102,6 +196,34 @@ namespace JueguitoLenguajes.ViewModel
             }
         }
 
+        private bool mostrarPopup = false;
+        public bool MostrarPopup
+        {
+            get => mostrarPopup;
+            set { mostrarPopup = value; Notificar(nameof(MostrarPopup)); }
+        }
+
+        private string popupTitulo = "";
+        public string PopupTitulo
+        {
+            get => popupTitulo;
+            set { popupTitulo = value; Notificar(nameof(PopupTitulo)); }
+        }
+
+        private string popupEmoji = "";
+        public string PopupEmoji
+        {
+            get => popupEmoji;
+            set { popupEmoji = value; Notificar(nameof(PopupEmoji)); }
+        }
+
+        private string popupSubtitulo = "";
+        public string PopupSubtitulo
+        {
+            get => popupSubtitulo;
+            set { popupSubtitulo = value; Notificar(nameof(PopupSubtitulo)); }
+        }
+
         private bool esMultijugador = false;
         public bool EsMultijugador
         {
@@ -110,6 +232,17 @@ namespace JueguitoLenguajes.ViewModel
             {
                 esMultijugador = value;
                 Notificar(nameof(EsMultijugador));
+            }
+        }
+
+        private bool esMultijugadorLocal = false;
+        public bool EsMultijugadorLocal
+        {
+            get => esMultijugadorLocal;
+            set
+            {
+                esMultijugadorLocal = value;
+                Notificar(nameof(EsMultijugadorLocal));
             }
         }
 
@@ -242,6 +375,7 @@ namespace JueguitoLenguajes.ViewModel
             {
                 nombreRegistro = value;
                 Notificar(nameof(NombreRegistro));
+                ErrorNombre = "";
             }
         }
 
@@ -253,7 +387,29 @@ namespace JueguitoLenguajes.ViewModel
             {
                 pwdRegistro = value;
                 Notificar(nameof(PwdRegistro));
+                ErrorPassword = "";
             }
+        }
+
+        private string errorNombre = "";
+        public string ErrorNombre
+        {
+            get => errorNombre;
+            set { errorNombre = value; Notificar(nameof(ErrorNombre)); }
+        }
+
+        private string errorPassword = "";
+        public string ErrorPassword
+        {
+            get => errorPassword;
+            set { errorPassword = value; Notificar(nameof(ErrorPassword)); }
+        }
+
+        private string errorGeneral = "";
+        public string ErrorGeneral
+        {
+            get => errorGeneral;
+            set { errorGeneral = value; Notificar(nameof(ErrorGeneral)); }
         }
 
         public string MensajeTurno => $"Turno de {(TurnoActual == Turno.X ? "X" : "O")}";
@@ -272,6 +428,7 @@ namespace JueguitoLenguajes.ViewModel
             if (J1 != null)
             {
                 VictoriasJ1 = J1.Victorias;
+                NivelBot = J1.NivelBot;
                 MostrarLoginJ1 = false;
                 MostrarLoginJ2 = true;
             }
@@ -287,22 +444,37 @@ namespace JueguitoLenguajes.ViewModel
 
         public void Registrar()
         {
-            if (string.IsNullOrWhiteSpace(nombreRegistro) || string.IsNullOrWhiteSpace(pwdRegistro))
+            ErrorGeneral = "";
+            var (nombreValido, errorNombre) = Sesion.ValidarNombre(nombreRegistro);
+            var (passwordValido, errorPassword) = Sesion.ValidarPassword(pwdRegistro);
+
+            if (!nombreValido)
             {
-                MessageBox.Show("Por favor ingresa nombre y contraseña");
+                ErrorNombre = errorNombre;
+                return;
+            }
+            if (!passwordValido)
+            {
+                ErrorPassword = errorPassword;
                 return;
             }
 
             bool registrado = Sesion.RegistrarCuenta(nombreRegistro, pwdRegistro);
             if (registrado)
             {
-                MessageBox.Show("¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.");
                 Sesion.SerializarCuentas();
-                VolverLogin();
+                ErrorGeneral = "¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.";
+                System.Threading.Tasks.Task.Delay(2000).ContinueWith(_ =>
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        VolverLogin();
+                    });
+                });
             }
             else
             {
-                MessageBox.Show("El usuario ya existe. Elige otro nombre.");
+                ErrorGeneral = "El usuario ya existe. Elige otro nombre.";
             }
         }
 
@@ -312,6 +484,9 @@ namespace JueguitoLenguajes.ViewModel
             MostrarLoginJ1 = true;
             NombreRegistro = "";
             PwdRegistro = "";
+            ErrorNombre = "";
+            ErrorPassword = "";
+            ErrorGeneral = "";
         }
 
         public void VolverALoginJ1()
@@ -335,6 +510,7 @@ namespace JueguitoLenguajes.ViewModel
             {
                 VictoriasJ2 = J2.Victorias;
                 EsMultijugador = true;
+                EsMultijugadorLocal = true;
                 MostrarLoginJ2 = false;
                 MostrarJuego = true;
                 LanzarMoneda();
@@ -343,8 +519,9 @@ namespace JueguitoLenguajes.ViewModel
 
         public void IniciarConBot()
         {
-            J2 = new Jugador() { Nombre = "Gala", Victorias = 666 };
+            J2 = new Jugador() { Nombre = "Gala", Victorias = 666, NivelBot = 3 };
             VictoriasJ2 = 666;
+            NivelBot = J1?.NivelBot ?? 1;
             EsMultijugador = false;
             MostrarLoginJ2 = false;
             MostrarJuego = true;
@@ -353,9 +530,38 @@ namespace JueguitoLenguajes.ViewModel
 
         public void LanzarMoneda()
         {
-            int lanzamiento = r.Next(0, 2);
-            TurnoActual = lanzamiento == 0 ? Turno.X : Turno.O;
+            if (EsMultijugador || EsMultijugadorLocal)
+            {
+                int lanzamiento = r.Next(0, 2);
+                TurnoActual = lanzamiento == 0 ? Turno.X : Turno.O;
+            }
+            else
+            {
+                TurnoActual = Turno.X;
+            }
+
+            Notificar(nameof(MensajeTurno));
+            Notificar(nameof(ColorTurno));
+
+            if (!EsMultijugador && !EsMultijugadorLocal)
+            {
+                if (TurnoActual == Turno.X)
+                {
+                    IniciarTimer();
+                }
+                else
+                {
+                    System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            JugarTurnoBot();
+                        });
+                    });
+                }
+            }
         }
+
         private bool VerificarVictoria()
         {
             string marcaActual = TurnoActual == Turno.X ? "X" : "O";
@@ -420,11 +626,11 @@ namespace JueguitoLenguajes.ViewModel
         public void MarcarCasilla(object parameter)
         {
             if (!JuegoActivo) return;
+            if (botEnProgreso) return;
 
             if (parameter is not string posicion)
                 return;
 
-            // Validar formato del movimiento usando regex del servicio de sesión
             if (!Sesion.ValidarMovimiento(posicion))
             {
                 MessageBox.Show("Formato de movimiento inválido. Debe ser 'fila,columna' donde ambos valores estén entre 0 y 2.");
@@ -444,6 +650,8 @@ namespace JueguitoLenguajes.ViewModel
                 return;
             }
 
+            DetenerTimer();
+
             string marca = TurnoActual == Turno.X ? "X" : "O";
             tablero[fila, columna] = marca;
             ActualizarCelda(fila, columna);
@@ -456,16 +664,35 @@ namespace JueguitoLenguajes.ViewModel
                 if (TurnoActual == Turno.X)
                 {
                     VictoriasJ1++;
-                    if (J1 != null) J1.Victorias++;
+                    if (J1 != null)
+                    {
+                        J1.Victorias++;
+                        if (!EsMultijugador && NivelBot < 3)
+                        {
+                            NivelBot++;
+                            J1.NivelBot = NivelBot;
+                        }
+                    }
                 }
                 else
                 {
                     VictoriasJ2++;
                     if (J2 != null) J2.Victorias++;
+                    if (!EsMultijugador && NivelBot > 1)
+                    {
+                        NivelBot--;
+                        if (J1 != null) J1.NivelBot = NivelBot;
+                    }
                 }
 
                 Sesion.SerializarCuentas();
-                MessageBox.Show($"¡{Ganador} gana!", "Fin del juego");
+                PopupEmoji = "🏆";
+                PopupTitulo = "¡Ganó X!";
+                PopupSubtitulo = $"{Ganador} gana la partida!";
+                Notificar(nameof(PopupEmoji));
+                Notificar(nameof(PopupTitulo));
+                Notificar(nameof(PopupSubtitulo));
+                MostrarPopup = true;
                 return;
             }
 
@@ -474,35 +701,59 @@ namespace JueguitoLenguajes.ViewModel
                 Ganador = "Empate";
                 JuegoActivo = false;
                 Empates++;
-                MessageBox.Show("¡Es un empate!", "Fin del juego");
+                PopupEmoji = "🤝";
+                PopupTitulo = "¡Empate!";
+                PopupSubtitulo = "Nadie gana esta vez";
+                Notificar(nameof(PopupEmoji));
+                Notificar(nameof(PopupTitulo));
+                Notificar(nameof(PopupSubtitulo));
+                MostrarPopup = true;
                 return;
             }
 
             TurnoActual = TurnoActual == Turno.X ? Turno.O : Turno.X;
+            Notificar(nameof(MensajeTurno));
+            Notificar(nameof(ColorTurno));
 
-            if (!EsMultijugador && TurnoActual == Turno.O)
+            if (!EsMultijugador && !EsMultijugadorLocal)
             {
-                System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
+                if (TurnoActual == Turno.O)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    DetenerTimer();
+                    System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
                     {
-                        TurnoBot();
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            JugarTurnoBot();
+                        });
                     });
-                });
+                }
+                else
+                {
+                    IniciarTimer();
+                }
             }
         }
 
-        private void TurnoBot()
+private void JugarTurnoBot()
         {
             if (!JuegoActivo) return;
+            botEnProgreso = true;
 
-            int fil = r.Next(0, 3);
-            int col = r.Next(0, 3);
+            int fil, col;
 
-            while (!string.IsNullOrEmpty(tablero[fil, col]))
+            switch (NivelBot)
             {
-                fil = r.Next(0, 3);
-                col = r.Next(0, 3);
+                case 1:
+                    (fil, col) = TurnoBotNivel1();
+                    break;
+                case 2:
+                    (fil, col) = TurnoBotNivel2();
+                    break;
+                case 3:
+                default:
+                    (fil, col) = TurnoBotNivel3();
+                    break;
             }
 
             tablero[fil, col] = "O";
@@ -513,8 +764,20 @@ namespace JueguitoLenguajes.ViewModel
                 Ganador = "Gala";
                 JuegoActivo = false;
                 VictoriasJ2++;
+                if (NivelBot > 1)
+                {
+                    NivelBot--;
+                    if (J1 != null) J1.NivelBot = NivelBot;
+                }
                 Sesion.SerializarCuentas();
-                MessageBox.Show($"¡{Ganador} gana!", "Fin del juego");
+                PopupEmoji = "🏆";
+                PopupTitulo = "¡Ganó O!";
+                PopupSubtitulo = "Gala gana la partida";
+                Notificar(nameof(PopupEmoji));
+                Notificar(nameof(PopupTitulo));
+                Notificar(nameof(PopupSubtitulo));
+                MostrarPopup = true;
+                botEnProgreso = false;
                 return;
             }
 
@@ -523,15 +786,158 @@ namespace JueguitoLenguajes.ViewModel
                 Ganador = "Empate";
                 JuegoActivo = false;
                 Empates++;
-                MessageBox.Show("¡Es un empate!", "Fin del juego");
+                PopupEmoji = "🤝";
+                PopupTitulo = "¡Empate!";
+                PopupSubtitulo = "Nadie gana esta vez";
+                MostrarPopup = true;
+                botEnProgreso = false;
                 return;
             }
 
+            botEnProgreso = false;
             TurnoActual = Turno.X;
+            Notificar(nameof(MensajeTurno));
+            Notificar(nameof(ColorTurno));
+            IniciarTimer();
+        }
+
+        private (int fila, int col) TurnoBotNivel1()
+        {
+            int fil = r.Next(0, 3);
+            int col = r.Next(0, 3);
+
+            while (!string.IsNullOrEmpty(tablero[fil, col]))
+            {
+                fil = r.Next(0, 3);
+                col = r.Next(0, 3);
+            }
+
+            return (fil, col);
+        }
+
+        private (int fila, int col) TurnoBotNivel2()
+        {
+            var (fil, col) = BuscarVictoriaInminente("O");
+            if (fil != -1) return (fil, col);
+
+            (fil, col) = BuscarVictoriaInminente("X");
+            if (fil != -1) return (fil, col);
+
+            return TurnoBotNivel1();
+        }
+
+        private (int fila, int col) TurnoBotNivel3()
+        {
+            int mejorScore = int.MinValue;
+            int mejorFila = -1, mejorCol = -1;
+
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    if (string.IsNullOrEmpty(tablero[i, j]))
+                    {
+                        tablero[i, j] = "O";
+                        int score = Minimax(0, false, int.MinValue, int.MaxValue);
+                        tablero[i, j] = "";
+
+                        if (score > mejorScore)
+                        {
+                            mejorScore = score;
+                            mejorFila = i;
+                            mejorCol = j;
+                        }
+                    }
+                }
+            }
+
+            return (mejorFila, mejorCol);
+        }
+
+        private int Minimax(int depth, bool esMaximizing, int alpha, int beta)
+        {
+            if (VerificarVictoriaParaMinimax("O")) return 10 - depth;
+            if (VerificarVictoriaParaMinimax("X")) return depth - 10;
+            if (VerificarEmpate()) return 0;
+
+            if (esMaximizing)
+            {
+                int maxScore = int.MinValue;
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        if (string.IsNullOrEmpty(tablero[i, j]))
+                        {
+                            tablero[i, j] = "O";
+                            int score = Minimax(depth + 1, false, alpha, beta);
+                            tablero[i, j] = "";
+                            maxScore = Math.Max(maxScore, score);
+                            alpha = Math.Max(alpha, score);
+                            if (beta <= alpha) return maxScore;
+                        }
+                    }
+                }
+                return maxScore;
+            }
+            else
+            {
+                int minScore = int.MaxValue;
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        if (string.IsNullOrEmpty(tablero[i, j]))
+                        {
+                            tablero[i, j] = "X";
+                            int score = Minimax(depth + 1, true, alpha, beta);
+                            tablero[i, j] = "";
+                            minScore = Math.Min(minScore, score);
+                            beta = Math.Min(beta, score);
+                            if (beta <= alpha) return minScore;
+                        }
+                    }
+                }
+                return minScore;
+            }
+        }
+
+        private (int fila, int col) BuscarVictoriaInminente(string marca)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    if (string.IsNullOrEmpty(tablero[i, j]))
+                    {
+                        tablero[i, j] = marca;
+                        bool gana = VerificarVictoriaParaMinimax(marca);
+                        tablero[i, j] = "";
+                        if (gana) return (i, j);
+                    }
+                }
+            }
+            return (-1, -1);
+        }
+
+        private bool VerificarVictoriaParaMinimax(string marca)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                if (tablero[i, 0] == marca && tablero[i, 1] == marca && tablero[i, 2] == marca) return true;
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                if (tablero[0, i] == marca && tablero[1, i] == marca && tablero[2, i] == marca) return true;
+            }
+            if (tablero[0, 0] == marca && tablero[1, 1] == marca && tablero[2, 2] == marca) return true;
+            if (tablero[0, 2] == marca && tablero[1, 1] == marca && tablero[2, 0] == marca) return true;
+return false;
         }
 
         private void InicializarTablero()
         {
+            DetenerTimer();
             for (int i = 0; i < 3; i++)
             {
                 for (int j = 0; j < 3; j++)
@@ -542,12 +948,41 @@ namespace JueguitoLenguajes.ViewModel
             JuegoActivo = true;
             TurnoActual = Turno.X;
             Ganador = "";
+            TiempoRestante = 0;
             ActualizarTodasLasCeldas();
         }
 
         public void ReiniciarJuego()
         {
             InicializarTablero();
+            LanzarMoneda();
+        }
+
+        public void AccionNuevoJuegoPopup()
+        {
+            MostrarPopup = false;
+            ReiniciarJuego();
+        }
+
+        public void CerrarSesion()
+        {
+            DetenerTimer();
+            J1 = null;
+            J2 = null;
+            VictoriasJ1 = 0;
+            VictoriasJ2 = 0;
+            Empates = 0;
+            NivelBot = 1;
+            NombreJ1 = "";
+            PwdJ1 = "";
+            NombreJ2 = "";
+            PwdJ2 = "";
+            InicializarTablero();
+            EsMultijugador = false;
+            EsMultijugadorLocal = false;
+            MostrarJuego = false;
+            MostrarLoginJ1 = true;
+            MostrarPopup = false;
         }
 
         // Propiedades para cada celda individual

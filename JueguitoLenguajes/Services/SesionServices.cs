@@ -43,20 +43,6 @@ namespace JueguitoLenguajes.Services
 
         public bool RegistrarCuenta(string nombre, string contraseña)
         {
-            // Validar formato de nombre de usuario usando regex
-            if (!ValidarNombreUsuario(nombre))
-            {
-                MessageBox.Show("Nombre de usuario inválido. Debe contener entre 3-20 caracteres alfanuméricos o guión bajo.");
-                return false;
-            }
-
-            // Validar formato de contraseña usando regex
-            if (!ValidarContrasenia(contraseña))
-            {
-                MessageBox.Show("Contraseña inválida. Debe tener al menos 6 caracteres, incluyendo letras y números.");
-                return false;
-            }
-
             bool existe = Cuentas.Any(c => c.Nombre == nombre);
             if (existe)
                 return false;
@@ -69,6 +55,24 @@ namespace JueguitoLenguajes.Services
 
             Cuentas.Add(nuevo);
             return true;
+        }
+
+        public (bool esValido, string error) ValidarNombre(string nombre)
+        {
+            if (string.IsNullOrWhiteSpace(nombre))
+                return (false, "El nombre no puede estar vacío");
+            if (!NombreUsuarioRegex.IsMatch(nombre))
+                return (false, "Debe tener 3-20 caracteres alfanuméricos");
+            return (true, "");
+        }
+
+        public (bool esValido, string error) ValidarPassword(string password)
+        {
+            if (string.IsNullOrWhiteSpace(password))
+                return (false, "La contraseña no puede estar vacía");
+            if (!ContraseniaRegex.IsMatch(password))
+                return (false, "Debe tener al menos 6 caracteres con letras y números");
+            return (true, "");
         }
 
         public void SerializarCuentas()

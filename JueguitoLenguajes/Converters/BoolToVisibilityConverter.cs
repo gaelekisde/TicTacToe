@@ -11,6 +11,8 @@ namespace JueguitoLenguajes.Converters
         {
             if (value is bool boolValue)
             {
+                bool inverted = parameter?.ToString() == "Invert";
+                if (inverted) boolValue = !boolValue;
                 return boolValue ? Visibility.Visible : Visibility.Collapsed;
             }
             return Visibility.Collapsed;
@@ -20,7 +22,9 @@ namespace JueguitoLenguajes.Converters
         {
             if (value is Visibility visibility)
             {
-                return visibility == Visibility.Visible;
+                bool result = visibility == Visibility.Visible;
+                bool inverted = parameter?.ToString() == "Invert";
+                return inverted ? !result : result;
             }
             return false;
         }

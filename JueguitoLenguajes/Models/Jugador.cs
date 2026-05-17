@@ -10,5 +10,6 @@ namespace JueguitoLenguajes.Models
         public string UrlImagen { get; set; }
         public int Victorias { get; set; }
         public string Contrasenia { get; set; }
+        public int NivelBot { get; set; } = 1;
     }
 }
